@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Auth Test</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.20.0/axios.min.js"></script>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <h1 class="row">Login</h1>
+
+        <main>
+            <div class="row">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username">
+            </div>
+
+            <div class="row">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password">
+            </div>
+
+            <div class="row" style="margin-top: 10px;">
+                <button id="login" class="btn btn-primary" onclick="login()">Login</button>
+                <button id="goDashboard" class="btn btn-success" style="display:none;" onclick="navigate('dashboard')">Dashboard</button>
+                <button id="goSettings" class="btn btn-info" style="display:none;" onclick="navigate('settings')">Settings</button>
+                <button id="logout" class="btn btn-danger" style="display:none;" onclick="logout()">Logout</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Login and store JWT in localStorage
+        function login() {
+            const data = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value
+            };
+
+            axios.post('/api/login', data)
+                .then(res => {
+                    document.getElementById('username').value = '';
+                    document.getElementById('password').value = '';
+
+                    if (res.data && res.data.success) {
+                        localStorage.setItem('jwt', res.data.token);
+
+                        // Show buttons for navigation
+                        document.getElementById('goDashboard').style.display = 'inline-block';
+                        document.getElementById('goSettings').style.display = 'inline-block';
+                        document.getElementById('logout').style.display = 'inline-block';
+
+                        navigate('dashboard');
+                    } else {
+                        alert('Login failed!');
+                    }
+                })
+                .catch(() => alert('Login failed!'));
+        }
+
+        // Navigate to a protected route
+        function navigate(route) {
+            loadRoute(route);
+        }
+
+        // Load protected routes (Dashboard or Settings)
+        function loadRoute(route) {
+            const token = localStorage.getItem('jwt');
+
+            axios.get(`/api/${route}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+                if (res.data && res.data.success) {
+                    document.querySelector('h1.row').innerHTML = route.charAt(0).toUpperCase() + route.slice(1);
+                    document.querySelector('main').innerHTML = `
+                        <p>${res.data.myContent}</p>
+                        <button class="btn btn-secondary" onclick="navigate('dashboard')">Dashboard</button>
+                        <button class="btn btn-secondary" onclick="navigate('settings')">Settings</button>
+                        <button class="btn btn-danger" onclick="logout()">Logout</button>
+                    `;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                if (err.response && err.response.status === 401) {
+                    alert('Session expired. Redirecting to login.');
+                    logout();
+                }
+            });
+        }
+
+        // Logout (clear JWT + reset UI)
+        function logout() {
+            localStorage.removeItem('jwt');
+            window.location.href = '/';
+        }
+
+        // Handle back/forward navigation
+        window.onpopstate = function(event) {
+            if (event.state && event.state.page) {
+                loadRoute(event.state.page);
+            } else {
+                window.location.href = '/';
+            }
+        };
+
+        // On page load, restore state if JWT still exists
+        window.onload = () => {
+            const token = localStorage.getItem('jwt');
+            if (token) {
+                document.getElementById('goDashboard').style.display = 'inline-block';
+                document.getElementById('goSettings').style.display = 'inline-block';
+                document.getElementById('logout').style.display = 'inline-block';
+            }
+        };
+    </script>
+</body>
+</html>
